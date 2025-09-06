@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PROFILE AND ACCOUNT SETTINGS</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      margin: 0;
+      padding: 0;
+      color: #fff;
+    }
+    header {
+      text-align: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #00e6e6;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .container {
+      max-width: 1000px;
+      margin: 30px auto;
+      background: rgba(255,255,255,0.08);
+      padding: 25px;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+    h2 {
+      text-align: center;
+      color: #00e6e6;
+      margin-bottom: 20px;
+      text-shadow: 0 0 8px #00e6e6;
+    }
+    form {
+      display: grid;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    label { font-weight: bold; }
+    input, select {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      width: 100%;
+      outline: none;
+      font-size: 15px;
+    }
+    input:focus, select:focus { box-shadow: 0 0 8px #00e6e6; }
+    button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      background: #00e6e6;
+      color: #000;
+      transition: 0.3s;
+      margin-top: 5px;
+    }
+    button:hover { background: #00b3b3; transform: scale(1.05); }
+    .card {
+      background: rgba(0,0,0,0.6);
+      padding: 20px;
+      margin-bottom: 15px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      transition: 0.3s;
+    }
+    .card:hover { transform: translateY(-5px); box-shadow: 0 0 20px #00e6e6; }
+    .card strong { color: #00e6e6; }
+    .section { margin-top: 30px; }
+    .search-box { text-align: center; margin: 20px 0; }
+    .search-box input { width: 50%; }
+    .export-buttons { text-align: center; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <header>PROFILE AND ACCOUNT SETTINGS</header>
+  <div class="container">
+    <h2>Add Profile</h2>
+    <form id="profileForm">
+      <label>Profile Type:</label>
+      <select id="profileType" onchange="toggleForm()" required>
+        <option value="">--Select--</option>
+        <option value="doctor">Doctor</option>
+        <option value="patient">Patient</option>
+      </select>
+      
+      <div id="commonFields" style="display:none;">
+        <label>Name:</label>
+        <input type="text" id="name" required>
+        <label>Email:</label>
+        <input type="email" id="email" required>
+        <label>ICD Code (Unique ID):</label>
+        <input type="text" id="icdCode" required>
+      </div>
+
+      <div id="doctorFields" style="display:none;">
+        <label>Specialization:</label>
+        <input type="text" id="specialization">
+        <label>Experience (Years):</label>
+        <input type="number" id="experience">
+        <label>Hospital:</label>
+        <input type="text" id="hospital">
+      </div>
+
+      <div id="patientFields" style="display:none;">
+        <label>Age:</label>
+        <input type="number" id="age">
+        <label>Blood Group:</label>
+        <select id="bloodGroup">
+          <option value="">--Select--</option>
+          <option>A+</option><option>A-</option>
+          <option>B+</option><option>B-</option>
+          <option>O+</option><option>O-</option>
+          <option>AB+</option><option>AB-</option>
+        </select>
+        <label>Allergies:</label>
+        <input type="text" id="allergies">
+      </div>
+
+      <button type="submit">Save Profile</button>
+    </form>
+
+    <div class="search-box">
+      <input type="text" id="searchICD" placeholder="Enter ICD Code to search">
+      <button onclick="searchProfile()">Search</button>
+    </div>
+
+    <div class="section">
+      <h2>Doctor Profiles</h2>
+      <div class="export-buttons">
+        <button onclick="exportCSV('doctor')">Export Doctors CSV</button>
+        <button onclick="exportPDF('doctor')">Export Doctors PDF</button>
+      </div>
+      <div id="doctorProfiles"></div>
+    </div>
+
+    <div class="section">
+      <h2>Patient Profiles</h2>
+      <div class="export-buttons">
+        <button onclick="exportCSV('patient')">Export Patients CSV</button>
+        <button onclick="exportPDF('patient')">Export Patients PDF</button>
+      </div>
+      <div id="patientProfiles"></div>
+    </div>
+  </div>
+
+  <script>
+    let doctors = JSON.parse(localStorage.getItem("doctors")) || [];
+    let patients = JSON.parse(localStorage.getItem("patients")) || [];
+
+    function toggleForm() {
+      const type = document.getElementById("profileType").value;
+      document.getElementById("commonFields").style.display = type ? "block" : "none";
+      document.getElementById("doctorFields").style.display = type === "doctor" ? "block" : "none";
+      document.getElementById("patientFields").style.display = type === "patient" ? "block" : "none";
+    }
+
+    document.getElementById("profileForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const type = document.getElementById("profileType").value;
+      const profile = {
+        name: document.getElementById("name").value,
+        email: document.getElementById("email").value,
+        icdCode: document.getElementById("icdCode").value
+      };
+      if (type === "doctor") {
+        profile.specialization = document.getElementById("specialization").value;
+        profile.experience = document.getElementById("experience").value;
+        profile.hospital = document.getElementById("hospital").value;
+        doctors.push(profile);
+        localStorage.setItem("doctors", JSON.stringify(doctors));
+      } else if (type === "patient") {
+        profile.age = document.getElementById("age").value;
+        profile.bloodGroup = document.getElementById("bloodGroup").value;
+        profile.allergies = document.getElementById("allergies").value;
+        patients.push(profile);
+        localStorage.setItem("patients", JSON.stringify(patients));
+      }
+      displayProfiles();
+      this.reset();
+      toggleForm();
+    });
+
+    function displayProfiles() {
+      const doctorDiv = document.getElementById("doctorProfiles");
+      const patientDiv = document.getElementById("patientProfiles");
+      doctorDiv.innerHTML = "";
+      patientDiv.innerHTML = "";
+
+      doctors.forEach((doc, i) => {
+        doctorDiv.innerHTML += `
+          <div class="card">
+            <strong>Name:</strong> ${doc.name}<br>
+            <strong>Email:</strong> ${doc.email}<br>
+            <strong>ICD Code:</strong> ${doc.icdCode}<br>
+            <strong>Specialization:</strong> ${doc.specialization}<br>
+            <strong>Experience:</strong> ${doc.experience} years<br>
+            <strong>Hospital:</strong> ${doc.hospital}<br>
+            <button onclick="deleteProfile('doctor', ${i})">Delete</button>
+          </div>`;
+      });
+
+      patients.forEach((pat, i) => {
+        patientDiv.innerHTML += `
+          <div class="card">
+            <strong>Name:</strong> ${pat.name}<br>
+            <strong>Email:</strong> ${pat.email}<br>
+            <strong>ICD Code:</strong> ${pat.icdCode}<br>
+            <strong>Age:</strong> ${pat.age}<br>
+            <strong>Blood Group:</strong> ${pat.bloodGroup}<br>
+            <strong>Allergies:</strong> ${pat.allergies}<br>
+            <button onclick="deleteProfile('patient', ${i})">Delete</button>
+          </div>`;
+      });
+    }
+
+    function deleteProfile(type, index) {
+      if (type === "doctor") {
+        doctors.splice(index, 1);
+        localStorage.setItem("doctors", JSON.stringify(doctors));
+      } else {
+        patients.splice(index, 1);
+        localStorage.setItem("patients", JSON.stringify(patients));
+      }
+      displayProfiles();
+    }
+
+    function searchProfile() {
+      const code = document.getElementById("searchICD").value.trim();
+      if (!code) return displayProfiles();
+      const doctorDiv = document.getElementById("doctorProfiles");
+      const patientDiv = document.getElementById("patientProfiles");
+      doctorDiv.innerHTML = "";
+      patientDiv.innerHTML = "";
+
+      doctors.filter(doc => doc.icdCode === code).forEach(doc => {
+        doctorDiv.innerHTML += `
+          <div class="card">
+            <strong>Name:</strong> ${doc.name}<br>
+            <strong>Email:</strong> ${doc.email}<br>
+            <strong>ICD Code:</strong> ${doc.icdCode}<br>
+            <strong>Specialization:</strong> ${doc.specialization}<br>
+            <strong>Experience:</strong> ${doc.experience} years<br>
+            <strong>Hospital:</strong> ${doc.hospital}<br>
+          </div>`;
+      });
+
+      patients.filter(pat => pat.icdCode === code).forEach(pat => {
+        patientDiv.innerHTML += `
+          <div class="card">
+            <strong>Name:</strong> ${pat.name}<br>
+            <strong>Email:</strong> ${pat.email}<br>
+            <strong>ICD Code:</strong> ${pat.icdCode}<br>
+            <strong>Age:</strong> ${pat.age}<br>
+            <strong>Blood Group:</strong> ${pat.bloodGroup}<br>
+            <strong>Allergies:</strong> ${pat.allergies}<br>
+          </div>`;
+      });
+    }
+
+    function exportCSV(type) {
+      let rows = [["Name","Email","ICD Code"]];
+      if (type === "doctor") {
+        rows[0].push("Specialization","Experience","Hospital");
+        doctors.forEach(d => rows.push([d.name,d.email,d.icdCode,d.specialization,d.experience,d.hospital]));
+      } else {
+        rows[0].push("Age","Blood Group","Allergies");
+        patients.forEach(p => rows.push([p.name,p.email,p.icdCode,p.age,p.bloodGroup,p.allergies]));
+      }
+      let csv = rows.map(r => r.join(",")).join("\n");
+      let blob = new Blob([csv], {type:"text/csv"});
+      let a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = type+"Profiles.csv";
+      a.click();
+    }
+
+    function exportPDF(type) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text(type.toUpperCase()+" PROFILES", 10, 10);
+      let y = 20;
+      if (type === "doctor") {
+        doctors.forEach(d => {
+          doc.text(`Name: ${d.name}, Email: ${d.email}, ICD: ${d.icdCode}, Spec: ${d.specialization}, Exp: ${d.experience}, Hosp: ${d.hospital}`, 10, y);
+          y += 10;
+        });
+      } else {
+        patients.forEach(p => {
+          doc.text(`Name: ${p.name}, Email: ${p.email}, ICD: ${p.icdCode}, Age: ${p.age}, Blood: ${p.bloodGroup}, Allergy: ${p.allergies}`, 10, y);
+          y += 10;
+        });
+      }
+      doc.save(type+"Profiles.pdf");
+    }
+
+    displayProfiles();
+  </script>
+</body>
+</html>
+
